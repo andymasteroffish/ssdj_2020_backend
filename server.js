@@ -19,6 +19,9 @@ var board = []
 var turn_time = 3000
 var beat_phase = 0
 
+var turn_num = 0
+var max_turn_num = 8
+
 //game state
 var STATE_WAITING = 0
 var STATE_PLAYING = 1
@@ -60,7 +63,12 @@ function tick(){
   if (game_state === STATE_PLAYING){
     if (beat_phase == 3){
       resolve()
-      send_board()
+      //if the game is still going, send the board
+      if (game_state == STATE_PLAYING){
+        send_board()
+      }else{
+        console.log("lol we are done")
+      }
       beat_phase = -1
     }
     else{
@@ -229,7 +237,8 @@ function send_game_end(){
 
   let val = {
     type:"game_end",
-    info: generate_game_info()
+    info: generate_game_info(),
+    wait_message: get_wait_message()
   }
   send_json_to_clients(JSON.stringify(val))
 }
@@ -239,6 +248,8 @@ function generate_game_info(){
   let val = {
     board:board,
     players:players,
+    turn_num: turn_num,
+    max_turn_num: max_turn_num,
     time:time
   }
 
@@ -315,6 +326,9 @@ setup()
 //reset
 function reset_game(){
   players = []
+
+  turn_num = 0
+
   board = new Array(cols)
   for (let i=0; i<cols; i++){
     board[i] = new Array(rows)
@@ -336,6 +350,7 @@ function start_game(){
 }
 
 function end_game(){
+  console.log("game over man")
   game_state = STATE_WAITING
 
   pregame_countdown_timer = countdown_ticks_to_game_start
@@ -350,6 +365,9 @@ function end_game(){
 }
 
 function resolve(){
+
+  turn_num++
+  console.log("turn "+turn_num+" out of "+max_turn_num)
 
   //update players
   for (let i=0; i<players.length; i++){
@@ -385,12 +403,14 @@ function resolve(){
     }
   }
 
-  //refresh the board where players are and store last position
+  //refresh the board where players are
   for (let i=0; i<players.length; i++){
     board[players[i].prev_x][players[i].prev_y].val = 4
+  }
 
-    // players[i].prev_x = players[i].x
-    // players[i].prev_y = players[i].y
+  //are we done?
+  if (turn_num >= max_turn_num){
+    end_game()
   }
 
 }
