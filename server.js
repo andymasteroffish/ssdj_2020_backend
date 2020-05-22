@@ -1,22 +1,17 @@
 //https://devcenter.heroku.com/articles/node-websockets
 
-'use strict';
+"use strict";
 
-const express = require('express');
-const { Server } = require('ws');
+const express = require("express");
+const { Server } = require("ws");
 
 //heroku will force this to be port 80
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
-const INDEX = '/index.html';  //TODO: get rid of this
+const INDEX = "/index.html"; //TODO: get rid of this
 
-const communication = require('./ws_communication.js')
-const game = require('./game.js')
-
-
-
-
-
+const communication = require("./ws_communication.js");
+const game = require("./game.js");
 
 //setting up a sevrer
 const server = express()
@@ -25,36 +20,30 @@ const server = express()
 
 const wss = new Server({ server });
 
-function setup(){
-  game.setup()
+function setup() {
+  game.setup();
 
   //setup the repeating loop
   setInterval(() => {
-    tick()
-  }, game.get_turn_time()/4);
+    tick();
+  }, game.get_turn_time() / 4);
 
-  console.log(game.get_turn_time())
+  console.log(game.get_turn_time());
 }
 
-function tick(){
-  game.tick()
+function tick() {
+  game.tick();
 }
 
 //getting a new connection
-wss.on('connection', (ws) => {
-  communication.got_connection(ws)
+wss.on("connection", ws => {
+  communication.got_connection(ws);
 });
 
-
-
-
-setup()
-
+setup();
 
 //***************
 //Gameplay
 //***************
 
 //reset
-
-
