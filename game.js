@@ -165,7 +165,7 @@ exports.join_player = function (msg, _ws){
   players.push(player);
 
   //send confirmation
-  player.ws.send( JSON.stringify({type:"join_confirm", player_info:player}))
+  player.ws.send( JSON.stringify({type:"join_confirm", info: exports.generate_game_info(), player_info:player}))
 }
 
 exports.parse_client_move = function(msg, ws){
