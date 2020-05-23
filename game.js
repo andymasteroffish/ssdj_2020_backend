@@ -39,6 +39,10 @@ var INPUT_SLASH = 2
 var INPUT_DASH = 3
 var INPUT_PARRY = 4
 
+//debug
+var in_slow_mode = false
+var slow_mode_can_resolve = false
+
 exports.setup = function(){
 	game_state = STATE_WAITING
  	exports.reset_game()
@@ -186,6 +190,10 @@ exports.parse_client_move = function(msg, ws){
 exports.tick = function(){
 	if (game_state === STATE_PLAYING){
 	    if (beat_phase == 3){
+        //if we're in the dbeug load, we might just wait
+        if (in_slow_mode && !slow_mode_can_resolve){
+          return;
+        }
 	      exports.resolve()
 	      //if the game is still going, send the board
 	      if (game_state == STATE_PLAYING){
@@ -348,6 +356,8 @@ exports.resolve_cleanup = function(){
     	player.input_type = INPUT_NONE
     	player.input_dir = DIR_NONE
 	}
+
+  slow_mode_can_resolve = false
 }
 
 
@@ -409,3 +419,15 @@ exports.get_game_state = function(){
 exports.get_beat_phase = function(){
 	return beat_phase
 }
+
+//debug
+exports.start_slow_test = function(){
+  in_slow_mode = true
+}
+exports.get_debug_resolve = function(){
+  slow_mode_can_resolve = true
+}
+
+
+
+

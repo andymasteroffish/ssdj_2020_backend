@@ -21,7 +21,7 @@ exports.got_connection = function (ws){
 
 	//start listening
 	ws.on('message', function incoming(msg_raw){
-		//console.log("I got "+msg_raw)
+		console.log("I got "+msg_raw)
 		let msg = JSON.parse(msg_raw)
 
 		if (msg.type === 'join_request'){
@@ -41,6 +41,15 @@ exports.got_connection = function (ws){
 		if (msg.type === "force_end"){
 			console.log("you have forced me to end")
 			game.end_game()
+		}
+
+		if (msg.type === "force_slow_test"){
+			console.log("debug: starting slow test")
+			game.start_slow_test()
+		}
+		if (msg.type === "resolve"){
+			console.log("debug:resolving ")
+			game.get_debug_resolve()
 		}
 
 	})
