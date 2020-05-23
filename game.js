@@ -104,7 +104,7 @@ exports.start_game = function(){
   beat_phase = 0
 }
 
-exports.end_game = function(){
+exports.end_game = function(winner){
   console.log("game over man")
   game_state = STATE_WAITING
 
@@ -116,7 +116,7 @@ exports.end_game = function(){
   }
 
   exports.reset_game()
-  communication.send_game_end()
+  communication.send_game_end(winner)
 }
 
 //creating a player object
@@ -262,6 +262,33 @@ exports.resolve = function(){
   turn_num++
   console.log("turn "+turn_num+" out of "+max_turn_num)
 
+  //is there a winner or a draw?
+  let num_living = 0
+  let num_dead = 0
+  let last_living_player = null
+  for (let i=0; i<players.length; i++){
+    if (players[i].is_dead){
+      num_dead ++
+    }
+    else{
+      num_living ++
+      last_living_player = players[i]
+    }
+  }
+  console.log(" living: "+num_living+"  dead: "+num_dead)
+
+  //if there is one living and no dead, I was probably testing
+  if (num_living == 1 && num_dead > 0){
+    console.log("we have a winner: "+last_living_player.disp_name)
+    exports.end_game(last_living_player)
+    return
+  }
+  if (num_living == 0){
+    console.log("everybody is dead")
+    exports.end_game(null)
+    return
+  }
+
   //initial player stuff
   for (let i=0; i<players.length; i++){
     let player = players[i]
@@ -287,61 +314,15 @@ exports.resolve = function(){
 
   }
 
+  //move until there are no conflicts
   exports.move_players()
 
-  //stun anybody who dahsed
+  //stun anybody who dashed
   for (let i=0; i<players.length; i++){
     if (players[i].input_type == INPUT_DASH){
       players[i].is_stunned = true
     }
   }
-
-	//move players
-  /*
-	for (let i=0; i<players.length; i++){
-    let player = players[i]
-
-    //if they're dead, they do nothing
-    if (player.is_dead){
-      player.input_type = INPUT_NONE
-      player.input_dir = DIR_NONE
-    }
-
-    //if they were stunned, just unstun them
-    if (player.is_stunned){
-    	player.is_stunned = false
-    	player.input_type = INPUT_NONE
-    	player.input_dir = DIR_NONE
-    }
-    else{
-
-	    //did they move?
-	    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
-
-	    	let target_pos = {
-	    		x:player.x,
-	    		y:player.y
-	    	}
-
-		    if (player.input_dir == DIR_UP) target_pos.y--
-		    if (player.input_dir == DIR_RIGHT) target_pos.x++
-		    if (player.input_dir == DIR_DOWN) target_pos.y++
-		    if (player.input_dir == DIR_LEFT) target_pos.x--
-
-		    if (exports.is_move_valid(target_pos)){
-		    	player.x = target_pos.x
-		    	player.y = target_pos.y
-		    }
-
-			}
-
-			//should they be stunned?
-			if (player.input_type == INPUT_DASH){
-				player.is_stunned = true
-			}
-		}
-	}
-  */
 
   //see if anybody got slashed
   let slash_points = []
@@ -388,10 +369,10 @@ exports.resolve = function(){
     }
   }
 
-	//are we done?
-	if (turn_num >= max_turn_num){
-	 exports.end_game()
-	}
+ //  //are we done?
+	// if (turn_num >= max_turn_num){
+	//  exports.end_game()
+	// }
 
 }
 

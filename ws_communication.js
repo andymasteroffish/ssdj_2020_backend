@@ -76,12 +76,13 @@ exports.send_wait_pulse = function(){
   exports.send_json_to_clients(JSON.stringify(val))
 }
 
-exports.send_game_end = function(){
+exports.send_game_end = function(winner){
 
   let val = {
     type:"game_end",
     info: game.generate_game_info(),
-    wait_message: game.get_wait_message()
+    wait_message: game.get_wait_message(),
+    winner:winner
   }
   exports.send_json_to_clients(JSON.stringify(val))
 }
