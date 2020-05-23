@@ -1,8 +1,8 @@
 const communication = require('./ws_communication.js')
 
 //board
-var cols = 6
-var rows = 5
+var cols = 9
+var rows = 8
 var board = []
 
 //timing (in millis)
@@ -33,6 +33,12 @@ var DIR_RIGHT = 1
 var DIR_DOWN = 2
 var DIR_LEFT = 3
 
+var INPUT_NONE = 0
+var INPUT_MOVE = 1
+var INPUT_SLASH = 2
+var INPUT_DASH = 3
+var INPUT_PARRY = 4
+
 exports.setup = function(){
 	game_state = STATE_WAITING
  	exports.reset_game()
@@ -57,19 +63,36 @@ exports.reset_game = function(){
 
   turn_num = 0
 
+  //create a 2d array
   board = new Array(cols)
   for (let i=0; i<cols; i++){
     board[i] = new Array(rows)
   }
-
+  //fill it up with new Tile objects
   for (let c=0; c<cols; c++){
     for (let r=0; r<rows; r++){
-      board[c][r] = {
-        val : 0,
-        prev_val : 0
-      }
+      board[c][r] = exports.make_tile()
     }
   }
+
+  //make the borders into walls
+  for (let c=0; c<cols; c++){
+  	board[c][0].passable = false
+  	board[c][rows-1].passable = false
+  }
+  for (let r=0; r<rows; r++){
+  	board[0][r].passable = false
+  	board[cols-1][r].passable = false
+  }
+
+  //testing
+  board[3][3].passable = false
+}
+
+exports.make_tile = function(){
+	return{
+		passable: true
+	}
 }
 
 exports.start_game = function(){
@@ -115,16 +138,21 @@ exports.join_player = function (msg, _ws){
       disp_name:msg.disp_name,
       x:0,
       y:0,
-      moved_this_turn:false,
+      prev_x:0,
+      prev_y:0,
+      is_dead:false,
+      is_stunned:false,
+      input_type:INPUT_NONE,
       input_dir:DIR_NONE,
-      games_played : 0
+      games_played : 0,
+      win_streak: 0
     }
     next_player_id++
   }
 
   //set starting pos
-  player.x = Math.floor(Math.random()*cols)
-  player.y = Math.floor(Math.random()*rows)
+  player.x = Math.floor(1+Math.random()*(cols-2))
+  player.y = Math.floor(1+Math.random()*(rows-2))
   player.prev_x = player.x
   player.prev_y = player.y
 
@@ -144,18 +172,14 @@ exports.parse_client_move = function(msg, ws){
     return
   }
 
+  //store some basic stuff
   player.moved_this_turn = true
-  player.prev_x = player.x
-  player.prev_y = player.y
 
-  //left
-  if (msg.key == 37)  player.input_dir = DIR_LEFT
-  //up
-  if (msg.key == 38)  player.input_dir = DIR_UP
-  //right
-  if (msg.key == 39)  player.input_dir = DIR_RIGHT
-  //down
-  if (msg.key == 40)  player.input_dir = DIR_DOWN
+  //check what it was
+  player.input_type = msg.action
+  player.input_dir = msg.dir
+
+  console.log("action: "+player.input_type+" in dir "+player.input_dir)
 
 }
 
@@ -169,6 +193,7 @@ exports.tick = function(){
 	      }else{
 	        console.log("lol we are done")
 	      }
+	      exports.resolve_cleanup()
 	      beat_phase = -1
 	    }
 	    else{
@@ -196,53 +221,107 @@ exports.tick = function(){
 
 exports.resolve = function(){
 
-  turn_num++
-  console.log("turn "+turn_num+" out of "+max_turn_num)
+	turn_num++
+	console.log("turn "+turn_num+" out of "+max_turn_num)
 
-  //update players
-  for (let i=0; i<players.length; i++){
-    let player = players[i]
+	//update players
+	for (let i=0; i<players.length; i++){
+	    let player = players[i]
 
-    //store their previous position
-    player.prev_x = player.x
-    player.prev_y = player.y
+	    //store their previous position
+	    player.prev_x = player.x
+	    player.prev_y = player.y
 
-    //did they move?
-    if (player.input_dir == DIR_UP) player.y--
-    if (player.input_dir == DIR_RIGHT) player.x++
-    if (player.input_dir == DIR_DOWN) player.y++
-    if (player.input_dir == DIR_LEFT) player.x--
+	    //if they were stuned, just unstun them
+	    if (player.is_stunned){
+	    	player.is_stunned = false
+	    	player.input_type = INPUT_NONE
+	    	player.input_dir = DIR_NONE
+	    }
+	    else{
 
-    //prep them for next turn
-    player.input_dir = DIR_NONE
+	    	console.log("move type: "+player.input_type)
 
-    //clamp to bounds
-    if (player.x >= cols)   players[i].x = cols-1
-    if (player.x < 0)       players[i].x = 0
-    if (player.y >= rows)   players[i].y = rows-1
-    if (player.y < 0)       players[i].y = 0
-  }
+		    //did they move?
+		    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
 
-  //tick down the board
-  for (let c=0; c<cols; c++){
-    for (let r=0; r<rows; r++){
-      board[c][r].prev_val =board[c][r].val
-      if (board[c][r].val > 0){
-        board[c][r].val --
-      }
-    }
-  }
+		    	let target_pos = {
+		    		x:player.x,
+		    		y:player.y
+		    	}
 
-  //refresh the board where players are
-  for (let i=0; i<players.length; i++){
-    board[players[i].prev_x][players[i].prev_y].val = 4
-  }
+			    if (player.input_dir == DIR_UP) target_pos.y--
+			    if (player.input_dir == DIR_RIGHT) target_pos.x++
+			    if (player.input_dir == DIR_DOWN) target_pos.y++
+			    if (player.input_dir == DIR_LEFT) target_pos.x--
 
-  //are we done?
-  if (turn_num >= max_turn_num){
-    exports.end_game()
-  }
+			    if (exports.is_move_valid(target_pos)){
+			    	player.x = target_pos.x
+			    	player.y = target_pos.y
+			    }
 
+			}
+
+			//should they be stunned?
+			if (player.input_type == INPUT_DASH){
+				player.is_stunned = true
+			}
+		}
+
+	}
+
+    // //clamp to bounds
+    // if (player.x >= cols)   players[i].x = cols-1
+    // if (player.x < 0)       players[i].x = 0
+    // if (player.y >= rows)   players[i].y = rows-1
+    // if (player.y < 0)       players[i].y = 0
+  
+
+  // //tick down the board
+  // for (let c=0; c<cols; c++){
+  //   for (let r=0; r<rows; r++){
+  //     board[c][r].prev_val =board[c][r].val
+  //     if (board[c][r].val > 0){
+  //       board[c][r].val --
+  //     }
+  //   }
+  // }
+
+  // //refresh the board where players are
+  // for (let i=0; i<players.length; i++){
+  //   board[players[i].prev_x][players[i].prev_y].val = 4
+  // }
+
+	//are we done?
+	if (turn_num >= max_turn_num){
+	exports.end_game()
+	}
+
+}
+
+//checks if a move location is free
+exports.is_move_valid = function(target_pos){
+	if (target_pos.x < 0 || target_pos.x >= cols || target_pos.y < 0 || target_pos.y >= rows){
+		return false
+	}
+
+	if (board[target_pos.x][target_pos.y].passable == false){
+		return false
+	}
+
+
+
+	return true
+}
+
+exports.resolve_cleanup = function(){
+
+	//reset players
+	for (let i=0; i<players.length; i++){
+    	let player = players[i]
+    	player.input_type = INPUT_NONE
+    	player.input_dir = DIR_NONE
+	}
 }
 
 

@@ -6,7 +6,7 @@ const express = require('express');
 const { Server } = require('ws');
 
 //heroku will force this to be port 80
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 const INDEX = '/index.html';  //TODO: get rid of this
 
