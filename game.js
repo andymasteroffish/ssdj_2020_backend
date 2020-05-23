@@ -39,6 +39,10 @@ var INPUT_SLASH = 2
 var INPUT_DASH = 3
 var INPUT_PARRY = 4
 
+//debug
+var in_slow_mode = false
+var slow_mode_can_resolve = false
+
 exports.setup = function(){
 	game_state = STATE_WAITING
  	exports.reset_game()
@@ -138,8 +142,7 @@ exports.join_player = function (msg, _ws){
       disp_name:msg.disp_name,
       x:0,
       y:0,
-      prev_x:0,
-      prev_y:0,
+      prev_state:{},
       is_dead:false,
       is_stunned:false,
       input_type:INPUT_NONE,
@@ -153,8 +156,9 @@ exports.join_player = function (msg, _ws){
   //set starting pos
   player.x = Math.floor(1+Math.random()*(cols-2))
   player.y = Math.floor(1+Math.random()*(rows-2))
-  player.prev_x = player.x
-  player.prev_y = player.y
+  player.prev_state.x = player.x
+  player.prev_state.y = player.y
+  player.prev_state.is_dead = player.is_dead
 
   console.log("got a new friend! id:"+player.id)
   
@@ -186,6 +190,10 @@ exports.parse_client_move = function(msg, ws){
 exports.tick = function(){
 	if (game_state === STATE_PLAYING){
 	    if (beat_phase == 3){
+        //if we're in the dbeug load, we might just wait
+        if (in_slow_mode && !slow_mode_can_resolve){
+          return;
+        }
 	      exports.resolve()
 	      //if the game is still going, send the board
 	      if (game_state == STATE_PLAYING){
@@ -229,8 +237,9 @@ exports.resolve = function(){
     let player = players[i]
 
     //store their previous position
-    player.prev_x = player.x
-    player.prev_y = player.y
+    player.prev_state.x = player.x
+    player.prev_state.y = player.y
+    player.prev_state.is_dead = player.is_dead
 
     //if they're dead, they do nothing
     if (player.is_dead){
@@ -348,6 +357,8 @@ exports.resolve_cleanup = function(){
     	player.input_type = INPUT_NONE
     	player.input_dir = DIR_NONE
 	}
+
+  slow_mode_can_resolve = false
 }
 
 
@@ -409,3 +420,15 @@ exports.get_game_state = function(){
 exports.get_beat_phase = function(){
 	return beat_phase
 }
+
+//debug
+exports.start_slow_test = function(){
+  in_slow_mode = true
+}
+exports.get_debug_resolve = function(){
+  slow_mode_can_resolve = true
+}
+
+
+
+
