@@ -21,7 +21,7 @@ exports.got_connection = function (ws){
 
 	//start listening
 	ws.on('message', function incoming(msg_raw){
-		console.log("I got "+msg_raw)
+		//console.log("I got "+msg_raw)
 		let msg = JSON.parse(msg_raw)
 
 		if (msg.type === 'join_request'){
