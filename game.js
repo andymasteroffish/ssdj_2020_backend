@@ -142,8 +142,7 @@ exports.join_player = function (msg, _ws){
       disp_name:msg.disp_name,
       x:0,
       y:0,
-      prev_x:0,
-      prev_y:0,
+      prev_state:{},
       is_dead:false,
       is_stunned:false,
       input_type:INPUT_NONE,
@@ -157,8 +156,9 @@ exports.join_player = function (msg, _ws){
   //set starting pos
   player.x = Math.floor(1+Math.random()*(cols-2))
   player.y = Math.floor(1+Math.random()*(rows-2))
-  player.prev_x = player.x
-  player.prev_y = player.y
+  player.prev_state.x = player.x
+  player.prev_state.y = player.y
+  player.prev_state.is_dead = player.is_dead
 
   console.log("got a new friend! id:"+player.id)
   
@@ -237,8 +237,9 @@ exports.resolve = function(){
     let player = players[i]
 
     //store their previous position
-    player.prev_x = player.x
-    player.prev_y = player.y
+    player.prev_state.x = player.x
+    player.prev_state.y = player.y
+    player.prev_state.is_dead = player.is_dead
 
     //if they're dead, they do nothing
     if (player.is_dead){
