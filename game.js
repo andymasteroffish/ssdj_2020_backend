@@ -1,8 +1,8 @@
 const communication = require('./ws_communication.js')
 
 //board
-var cols = 9
-var rows = 8
+var cols = 6
+var rows = 5
 var board = []
 
 //timing (in millis)
@@ -86,7 +86,7 @@ exports.reset_game = function(){
   }
 
   //testing
-  board[3][3].passable = false
+  board[2][2].passable = false
 }
 
 exports.make_tile = function(){
@@ -245,8 +245,6 @@ exports.resolve = function(){
     	player.input_dir = DIR_NONE
     }
     else{
-
-    	console.log("move type: "+player.input_type)
 
 	    //did they move?
 	    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
