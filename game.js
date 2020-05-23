@@ -10,7 +10,7 @@ var turn_time = 3000
 var beat_phase = 0
 
 var turn_num = 0
-var max_turn_num = 8
+var max_turn_num = 800
 
 //game state
 var game_state = 0
@@ -221,44 +221,50 @@ exports.tick = function(){
 
 exports.resolve = function(){
 
-	turn_num++
-	console.log("turn "+turn_num+" out of "+max_turn_num)
+  turn_num++
+  console.log("turn "+turn_num+" out of "+max_turn_num)
 
-	//update players
+	//move players
 	for (let i=0; i<players.length; i++){
-	    let player = players[i]
+    let player = players[i]
 
-	    //store their previous position
-	    player.prev_x = player.x
-	    player.prev_y = player.y
+    //store their previous position
+    player.prev_x = player.x
+    player.prev_y = player.y
 
-	    //if they were stuned, just unstun them
-	    if (player.is_stunned){
-	    	player.is_stunned = false
-	    	player.input_type = INPUT_NONE
-	    	player.input_dir = DIR_NONE
-	    }
-	    else{
+    //if they're dead, they do nothing
+    if (player.is_dead){
+      player.input_type = INPUT_NONE
+      player.input_dir = DIR_NONE
+    }
 
-	    	console.log("move type: "+player.input_type)
+    //if they were stunned, just unstun them
+    if (player.is_stunned){
+    	player.is_stunned = false
+    	player.input_type = INPUT_NONE
+    	player.input_dir = DIR_NONE
+    }
+    else{
 
-		    //did they move?
-		    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
+    	console.log("move type: "+player.input_type)
 
-		    	let target_pos = {
-		    		x:player.x,
-		    		y:player.y
-		    	}
+	    //did they move?
+	    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
 
-			    if (player.input_dir == DIR_UP) target_pos.y--
-			    if (player.input_dir == DIR_RIGHT) target_pos.x++
-			    if (player.input_dir == DIR_DOWN) target_pos.y++
-			    if (player.input_dir == DIR_LEFT) target_pos.x--
+	    	let target_pos = {
+	    		x:player.x,
+	    		y:player.y
+	    	}
 
-			    if (exports.is_move_valid(target_pos)){
-			    	player.x = target_pos.x
-			    	player.y = target_pos.y
-			    }
+		    if (player.input_dir == DIR_UP) target_pos.y--
+		    if (player.input_dir == DIR_RIGHT) target_pos.x++
+		    if (player.input_dir == DIR_DOWN) target_pos.y++
+		    if (player.input_dir == DIR_LEFT) target_pos.x--
+
+		    if (exports.is_move_valid(target_pos)){
+		    	player.x = target_pos.x
+		    	player.y = target_pos.y
+		    }
 
 			}
 
@@ -267,34 +273,56 @@ exports.resolve = function(){
 				player.is_stunned = true
 			}
 		}
-
 	}
 
-    // //clamp to bounds
-    // if (player.x >= cols)   players[i].x = cols-1
-    // if (player.x < 0)       players[i].x = 0
-    // if (player.y >= rows)   players[i].y = rows-1
-    // if (player.y < 0)       players[i].y = 0
-  
+  //see if anybody got slashed
+  let slash_points = []
+  for (let i=0; i<players.length; i++){
+    let player = players[i]
 
-  // //tick down the board
-  // for (let c=0; c<cols; c++){
-  //   for (let r=0; r<rows; r++){
-  //     board[c][r].prev_val =board[c][r].val
-  //     if (board[c][r].val > 0){
-  //       board[c][r].val --
-  //     }
-  //   }
-  // }
+    if (player.input_type == INPUT_DASH || player.input_type == INPUT_SLASH){
+      let point = {
+        x:player.x,
+        y:player.y,
+        attacker:player
+      }
+      if (player.input_dir == DIR_UP) point.y--
+      if (player.input_dir == DIR_RIGHT) point.x++
+      if (player.input_dir == DIR_DOWN) point.y++
+      if (player.input_dir == DIR_LEFT) point.x--
 
-  // //refresh the board where players are
-  // for (let i=0; i<players.length; i++){
-  //   board[players[i].prev_x][players[i].prev_y].val = 4
-  // }
+      slash_points.push(point)
+    }
+  }
+
+  //anybody standing on a slash point?
+  for (let i=0; i<players.length; i++){
+    let player = players[i]
+    let attacked_this_turn = false
+    for (let s=0; s<slash_points.length; s++){
+      let slash_point = slash_points[s]
+      if (slash_point.x == player.x && slash_point.y == player.y){
+        console.log(player.disp_name + " is in the dead zone")
+        attacked_this_turn = true
+        if (player.input_type == INPUT_PARRY){
+          console.log("but they parried")
+          slash_point.attacker.is_stunned = true
+        }
+        else{
+          player.is_dead = true
+        }
+      }
+    }
+
+    //if they parried but were not attacked, they get stunned
+    if (player.input_type == INPUT_PARRY && attacked_this_turn == false){
+      player.is_stunned = true
+    }
+  }
 
 	//are we done?
 	if (turn_num >= max_turn_num){
-	exports.end_game()
+	 exports.end_game()
 	}
 
 }
