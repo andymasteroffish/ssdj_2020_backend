@@ -104,7 +104,7 @@ exports.start_game = function(){
   beat_phase = 0
 }
 
-exports.end_game = function(){
+exports.end_game = function(winner){
   console.log("game over man")
   game_state = STATE_WAITING
 
@@ -116,7 +116,7 @@ exports.end_game = function(){
   }
 
   exports.reset_game()
-  communication.send_game_end()
+  communication.send_game_end(winner)
 }
 
 //creating a player object
@@ -147,6 +147,7 @@ exports.join_player = function (msg, _ws){
       is_stunned:false,
       input_type:INPUT_NONE,
       input_dir:DIR_NONE,
+      last_valid_input_dir:DIR_UP,
       games_played : 0,
       win_streak: 0
     }
@@ -154,8 +155,9 @@ exports.join_player = function (msg, _ws){
   }
 
   //set starting pos
-  player.x = Math.floor(1+Math.random()*(cols-2))
-  player.y = Math.floor(1+Math.random()*(rows-2))
+  let spawn_pos = exports.get_valid_spawn()
+  player.x = spawn_pos.x
+  player.y = spawn_pos.y
   player.prev_state.x = player.x
   player.prev_state.y = player.y
   player.prev_state.is_dead = player.is_dead
@@ -166,6 +168,31 @@ exports.join_player = function (msg, _ws){
 
   //send confirmation
   player.ws.send( JSON.stringify({type:"join_confirm", info: exports.generate_game_info(), player_info:player}))
+}
+
+exports.get_valid_spawn = function(){
+  let pos = { x:0, y:0}
+
+  let is_valid = false
+  while(!is_valid){
+    pos.x = Math.floor(1+Math.random()*(cols-2))
+    pos.y = Math.floor(1+Math.random()*(rows-2))
+    is_valid = true
+
+    //is this impassable?
+    if (board[pos.x][pos.y].passable == false){
+      is_valid = false
+    }
+    //is somebody else here?
+    for (let i=0; i<players.length; i++){
+      if (pos.x == players[i].x && pos.y == players[i].y){
+        is_valid = false
+      }
+    }
+  }
+
+  return pos
+
 }
 
 exports.parse_client_move = function(msg, ws){
@@ -182,6 +209,9 @@ exports.parse_client_move = function(msg, ws){
   //check what it was
   player.input_type = msg.action
   player.input_dir = msg.dir
+  if (player.input_dir != INPUT_NONE){
+    player.last_valid_input_dir = player.input_dir
+  }
 
   console.log("action: "+player.input_type+" in dir "+player.input_dir)
 
@@ -232,8 +262,35 @@ exports.resolve = function(){
   turn_num++
   console.log("turn "+turn_num+" out of "+max_turn_num)
 
-	//move players
-	for (let i=0; i<players.length; i++){
+  //is there a winner or a draw?
+  let num_living = 0
+  let num_dead = 0
+  let last_living_player = null
+  for (let i=0; i<players.length; i++){
+    if (players[i].is_dead){
+      num_dead ++
+    }
+    else{
+      num_living ++
+      last_living_player = players[i]
+    }
+  }
+  console.log(" living: "+num_living+"  dead: "+num_dead)
+
+  //if there is one living and no dead, I was probably testing
+  if (num_living == 1 && num_dead > 0){
+    console.log("we have a winner: "+last_living_player.disp_name)
+    exports.end_game(last_living_player)
+    return
+  }
+  if (num_living == 0){
+    console.log("everybody is dead")
+    exports.end_game(null)
+    return
+  }
+
+  //initial player stuff
+  for (let i=0; i<players.length; i++){
     let player = players[i]
 
     //store their previous position
@@ -249,38 +306,23 @@ exports.resolve = function(){
 
     //if they were stunned, just unstun them
     if (player.is_stunned){
-    	player.is_stunned = false
-    	player.input_type = INPUT_NONE
-    	player.input_dir = DIR_NONE
+      player.is_stunned = false
+      player.input_type = INPUT_NONE
+      player.input_dir = DIR_NONE
     }
-    else{
 
-	    //did they move?
-	    if (player.input_type == INPUT_MOVE || player.input_type == INPUT_DASH){
 
-	    	let target_pos = {
-	    		x:player.x,
-	    		y:player.y
-	    	}
+  }
 
-		    if (player.input_dir == DIR_UP) target_pos.y--
-		    if (player.input_dir == DIR_RIGHT) target_pos.x++
-		    if (player.input_dir == DIR_DOWN) target_pos.y++
-		    if (player.input_dir == DIR_LEFT) target_pos.x--
+  //move until there are no conflicts
+  exports.move_players()
 
-		    if (exports.is_move_valid(target_pos)){
-		    	player.x = target_pos.x
-		    	player.y = target_pos.y
-		    }
-
-			}
-
-			//should they be stunned?
-			if (player.input_type == INPUT_DASH){
-				player.is_stunned = true
-			}
-		}
-	}
+  //stun anybody who dashed
+  for (let i=0; i<players.length; i++){
+    if (players[i].input_type == INPUT_DASH){
+      players[i].is_stunned = true
+    }
+  }
 
   //see if anybody got slashed
   let slash_points = []
@@ -327,11 +369,188 @@ exports.resolve = function(){
     }
   }
 
-	//are we done?
-	if (turn_num >= max_turn_num){
-	 exports.end_game()
-	}
+ //  //are we done?
+	// if (turn_num >= max_turn_num){
+	//  exports.end_game()
+	// }
 
+}
+
+exports.move_players = function(){
+  console.log("---- START MOVE ----")
+  let unresolved = []
+  let occupied_spots = []
+
+  for (let i=0; i<players.length; i++){
+    let player = players[i]
+
+    let skip = false
+    //dead and stunned players will stay where they are no matter what
+    if (player.is_dead || player.is_stunned){
+      skip = true
+    }
+    //same for slashing or stationary players
+    if (player.input_type == INPUT_SLASH || player.input_type == INPUT_PARRY || player.input_type == INPUT_NONE){
+      skip = true
+    }
+
+    if (skip){
+      if (!player.is_dead){
+        occupied_spots.push( {x:player.x, y:player.y} )
+      }
+    }else{
+      unresolved.push(player)
+    }
+  }
+
+  console.log("num unresolved: "+unresolved.length)
+
+  //for unresolved players, I need a little more info to track 'em
+  for (let i=unresolved.length-1; i>=0; i--){
+    let player = unresolved[i]
+    if (player.input_type != INPUT_MOVE && player.input_type != INPUT_DASH){
+      console.log("BAD BAD THIS PLAYER SHOULD NOT MOVE WITH INPUT: "+player.input_type)
+    }
+
+    //make a holder for this info
+    let move_info = {}
+    move_info.succeeded = true
+
+    //start by figuring out where they want to go
+    move_info.target_pos = {
+      x:player.x,
+      y:player.y
+    }
+    if (player.input_dir == DIR_UP)     move_info.target_pos.y--
+    if (player.input_dir == DIR_RIGHT)  move_info.target_pos.x++
+    if (player.input_dir == DIR_DOWN)   move_info.target_pos.y++
+    if (player.input_dir == DIR_LEFT)   move_info.target_pos.x--
+
+    player.move_info = move_info
+
+    //if anybody walked into a wall we can resolve them right now
+    if (exports.is_move_valid(player.move_info.target_pos) == false){
+      console.log(player.disp_name+" walked into a wall")
+      occupied_spots.push( {x:player.x, y:player.y} )
+      unresolved.splice(i, 1)
+    }
+  }
+
+  console.log("num unresolved before loop: "+unresolved.length)
+
+  
+  //after that we need to go through in waves attempting to resolve the safest move
+  let num_tries = 0
+  while (unresolved.length > 0 && num_tries < 99){
+    num_tries++
+    console.log("--move pass "+num_tries+"--")
+    let fails_on_this_pass = 0
+
+    for (let i=unresolved.length-1; i>=0; i--){
+      let mover = unresolved[i]
+      console.log(" checking "+mover.disp_name)
+
+      let is_safe_to_move = true
+      //let cannot_move = false
+
+      //if two players would swap spots, the move is illegal
+      for (let u=unresolved.length-1; u>=0; u--){
+        let other = unresolved[u]
+        if (other != mover){
+          if (mover.move_info.target_pos.x == other.x &&
+              mover.move_info.target_pos.y == other.y &&
+              other.move_info.target_pos.x == mover.x &&
+              other.move_info.target_pos.y == mover.y){
+
+            mover.move_info.succeeded = false
+            other.move_info.succeeded = false
+            is_safe_to_move = false
+
+            console.log("no swapping places")
+          }
+
+          //also illegal to have the same target
+          if (mover.move_info.target_pos.x == other.move_info.target_pos.x &&
+              mover.move_info.target_pos.y == other.move_info.target_pos.y){
+
+            mover.move_info.succeeded = false
+            other.move_info.succeeded = false
+            is_safe_to_move = false
+
+            console.log(mover.disp_name+" and "+other.disp_name+" want to go to the same spot")
+          }
+        }
+      }
+
+      //is the target is occupied, the move fails
+      console.log(" against "+occupied_spots.length+" occupied spots")
+      for (let o=0; o<occupied_spots.length; o++){
+        if (mover.move_info.target_pos.x == occupied_spots[o].x && mover.move_info.target_pos.y == occupied_spots[o].y){
+          console.log(mover.disp_name+" trying to move to occupied spot")
+          mover.move_info.succeeded = false
+          is_safe_to_move = false
+        }
+      }
+
+
+
+      // if (cannot_move){
+      //   console.log(mover.disp_name+" cannot move")
+      //   occupied_spots.push( {x:mover.x, y:mover.y} )
+      //   unresolved.splice(i, 1)
+      // }
+      // else{
+      if (is_safe_to_move){
+        //any other unresolved in or looking to move ot the same spot?
+        for (let u=unresolved.length-1; u>=0; u--){
+          let other = unresolved[u]
+          if (other != mover){
+            if ( (mover.move_info.target_pos.x == other.x && mover.move_info.target_pos.y == other.y) || (mover.move_info.target_pos.x == other.move_info.target_pos.x && mover.move_info.target_pos.y == other.move_info.target_pos.y)){
+              is_safe_to_move = false
+            }
+          }
+        }
+
+        if (is_safe_to_move){
+          console.log(mover.disp_name+" is safe to move")
+          mover.x = mover.move_info.target_pos.x
+          mover.y = mover.move_info.target_pos.y
+          mover.move_info.succeeded = true
+          occupied_spots.push( {x:mover.x, y:mover.y} )
+          unresolved.splice(i, 1)
+        }
+
+      }
+    }
+
+    //go through and see if we can remove any failuers
+    for (let i=unresolved.length-1; i>=0; i--){
+      let mover = unresolved[i]
+      if (mover.move_info.succeeded == false){
+        console.log(mover.disp_name +" cannot move")
+        occupied_spots.push( {x:mover.x, y:mover.y} )
+        unresolved.splice(i, 1)
+        fails_on_this_pass++
+      }
+    }
+
+    console.log(fails_on_this_pass+" moves were invalidated")
+
+    //if nothing fails aprove whatever is left
+    if (fails_on_this_pass == 0){
+      console.log("we are done")
+      for (let i=unresolved.length-1; i>=0; i--){
+        let mover = unresolved[i]
+        console.log("  aproving "+mover.disp_name)
+        mover.x = mover.move_info.target_pos.x
+        mover.y = mover.move_info.target_pos.y
+      }
+      unresolved = []
+    }
+
+  }
+
+  console.log("done with moves")
 }
 
 //checks if a move location is free
@@ -398,7 +617,10 @@ exports.remove_player = function(ws){
 	for (let i=0; i<players.length; i++){
 		if (players[i].ws == ws){
 			console.log("found and killed player")
-			players.splice(i, 1)
+      //during the game, only remove the player if they are alive
+      if (game_state == STATE_WAITING || !players[i].is_dead){
+			 players.splice(i, 1)
+      }
 			if ( game_state == STATE_WAITING){
 			  communication.send_wait_pulse()
 			}
