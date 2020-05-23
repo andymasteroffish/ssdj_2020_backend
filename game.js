@@ -43,6 +43,10 @@ var INPUT_PARRY = 4
 var in_slow_mode = false
 var slow_mode_can_resolve = false
 
+//player sprites
+var num_sprite_packs = 8
+var available_sprite_packs = []
+
 exports.setup = function(){
 	game_state = STATE_WAITING
  	exports.reset_game()
@@ -64,6 +68,12 @@ exports.get_base_info = function(){
 
 exports.reset_game = function(){
   players = []
+
+  //mark that all characters are available
+  available_sprite_packs = []
+  for (let i=0; i<num_sprite_packs; i++){
+    available_sprite_packs.push(true)
+  }
 
   turn_num = 0
 
@@ -122,6 +132,7 @@ exports.end_game = function(winner){
 //creating a player object
 exports.join_player = function (msg, _ws){
 
+  console.log(msg)
   let player = null
 
   //was this player in last round?
@@ -133,13 +144,16 @@ exports.join_player = function (msg, _ws){
     }
   }
 
+
   //otherwise make a new one
   if (player == null){
     console.log("time for a new baby")
     player = {
       ws:_ws,
       id:next_player_id,
+      uuid:msg.uuid,
       disp_name:msg.disp_name,
+      sprite_pack: exports.get_next_sprite_pack(),
       x:0,
       y:0,
       prev_state:{},
@@ -163,6 +177,9 @@ exports.join_player = function (msg, _ws){
   player.prev_state.is_dead = player.is_dead
 
   console.log("got a new friend! id:"+player.id)
+
+  player.uuid = msg.uuid
+  console.log("  my uuid: "+msg.uuid)
   
   players.push(player);
 
@@ -193,6 +210,17 @@ exports.get_valid_spawn = function(){
 
   return pos
 
+}
+
+exports.get_next_sprite_pack = function(){
+  for (let i=0; i<num_sprite_packs; i++){
+    if (available_sprite_packs[i]){
+      available_sprite_packs[i] = false
+      return i
+    }
+  }
+  console.log("ran out of sprite packs!!!!")
+  return 0
 }
 
 exports.parse_client_move = function(msg, ws){
@@ -249,11 +277,10 @@ exports.tick = function(){
 
 	    if (players.length >= min_players_to_start){
 	      pregame_countdown_timer--
-	      communication.send_wait_pulse()
 	    }else if (pregame_countdown_timer != countdown_ticks_to_game_start){
 	      pregame_countdown_timer = countdown_ticks_to_game_start
-	      communication.send_wait_pulse()
 	    }
+      communication.send_wait_pulse()
 	}
 }
 
@@ -588,8 +615,11 @@ exports.generate_game_info = function(){
     players:players,
     turn_num: turn_num,
     max_turn_num: max_turn_num,
-    time:time
+    time:time,
+    game_state:game_state
   }
+
+  //console.log("game state "+val.game_state)
 
   return val
 }

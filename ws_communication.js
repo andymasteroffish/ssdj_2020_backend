@@ -68,6 +68,7 @@ exports.got_connection = function (ws){
 }
 
 exports.send_wait_pulse = function(){
+	//console.log("send wait pulse")
   let val = {
     type:"wait_pulse",
     info: game.generate_game_info(),
