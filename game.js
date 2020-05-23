@@ -617,7 +617,10 @@ exports.remove_player = function(ws){
 	for (let i=0; i<players.length; i++){
 		if (players[i].ws == ws){
 			console.log("found and killed player")
-			players.splice(i, 1)
+      //during the game, only remove the player if they are alive
+      if (game_state == STATE_WAITING || !players[i].is_dead){
+			 players.splice(i, 1)
+      }
 			if ( game_state == STATE_WAITING){
 			  communication.send_wait_pulse()
 			}
