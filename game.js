@@ -29,7 +29,7 @@ var prev_players = [];
 //var next_player_id = 0
 
 var min_players_to_start = 2
-var countdown_ticks_to_game_start = 20
+var countdown_ticks_to_game_start = 15
 var pregame_countdown_timer = countdown_ticks_to_game_start
 
 //some direction stuff
