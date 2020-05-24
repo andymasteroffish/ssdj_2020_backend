@@ -140,6 +140,10 @@ exports.end_game = function(winner){
 
 //creating a player object
 exports.join_player = function (msg, _ws){
+  if (available_sprite_packs.length == 0){
+    console.log("no more room!")
+    return
+  }
 
   console.log(msg)
   let player = null
