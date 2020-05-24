@@ -17,10 +17,12 @@ var game_state = 0
 var STATE_WAITING = 0
 var STATE_PLAYING = 1
 
+var prev_winner = null
+
 //players (a subset of clients)
 var players = [];
 var prev_players = [];
-var next_player_id = 0
+//var next_player_id = 0
 
 var min_players_to_start = 2
 var countdown_ticks_to_game_start = 20
@@ -44,7 +46,7 @@ var in_slow_mode = false
 var slow_mode_can_resolve = false
 
 //player sprites
-var num_sprite_packs = 8
+//var num_sprite_packs = 8
 var available_sprite_packs = []
 
 exports.setup = function(){
@@ -71,9 +73,15 @@ exports.reset_game = function(){
 
   //mark that all characters are available
   available_sprite_packs = []
-  for (let i=0; i<num_sprite_packs; i++){
-    available_sprite_packs.push(true)
-  }
+  available_sprite_packs.push("BaldyBlue")
+  available_sprite_packs.push("CrypticCyan")
+  available_sprite_packs.push("GooeyGreen")
+  available_sprite_packs.push("OrneryOrange")
+  available_sprite_packs.push("PlacidPink")
+  available_sprite_packs.push("RadRed")
+  available_sprite_packs.push("ViciousViolet")
+  available_sprite_packs.push("ViciousViolet")
+  
 
   turn_num = 0
 
@@ -115,8 +123,9 @@ exports.start_game = function(){
 }
 
 exports.end_game = function(winner){
-  console.log("game over man")
+  console.log("game over man. winner: "+winner)
   game_state = STATE_WAITING
+  prev_winner = winner
 
   pregame_countdown_timer = countdown_ticks_to_game_start
   
@@ -126,7 +135,7 @@ exports.end_game = function(winner){
   }
 
   exports.reset_game()
-  communication.send_game_end(winner)
+  communication.send_game_end()
 }
 
 //creating a player object
@@ -150,7 +159,7 @@ exports.join_player = function (msg, _ws){
     console.log("time for a new baby")
     player = {
       ws:_ws,
-      id:next_player_id,
+      //id:next_player_id,
       uuid:msg.uuid,
       disp_name:msg.disp_name,
       sprite_pack: exports.get_next_sprite_pack(),
@@ -165,7 +174,7 @@ exports.join_player = function (msg, _ws){
       games_played : 0,
       win_streak: 0
     }
-    next_player_id++
+    //next_player_id++
   }
 
   //set starting pos
@@ -213,14 +222,25 @@ exports.get_valid_spawn = function(){
 }
 
 exports.get_next_sprite_pack = function(){
-  for (let i=0; i<num_sprite_packs; i++){
-    if (available_sprite_packs[i]){
-      available_sprite_packs[i] = false
-      return i
-    }
+  if (available_sprite_packs.length < 0){
+    console.log("NO MORE SPRITE PACKS!!!!")
+    return null
   }
-  console.log("ran out of sprite packs!!!!")
-  return 0
+
+  let index = Math.floor(Math.random()*available_sprite_packs.length)
+  let val = available_sprite_packs[index]
+  console.log("give them sprite pack "+index+" : "+val)
+
+  available_sprite_packs.splice(index, 1)
+  return val
+  // for (let i=0; i<num_sprite_packs; i++){
+  //   if (available_sprite_packs[i]){
+  //     available_sprite_packs[i] = false
+  //     return i
+  //   }
+  // }
+  // console.log("ran out of sprite packs!!!!")
+  // return 0
 }
 
 exports.parse_client_move = function(msg, ws){
@@ -237,7 +257,7 @@ exports.parse_client_move = function(msg, ws){
   //check what it was
   player.input_type = msg.action
   player.input_dir = msg.dir
-  if (player.input_dir != INPUT_NONE){
+  if (player.input_dir != DIR_NONE){
     player.last_valid_input_dir = player.input_dir
   }
 
@@ -325,6 +345,15 @@ exports.resolve = function(){
     player.prev_state.y = player.y
     player.prev_state.is_dead = player.is_dead
 
+    //info on if their move succeeded or not. Assume it did
+    let move_info = {}
+    move_info.succeeded = true
+    move_info.target_pos = {
+      x:player.x,
+      y:player.y
+    }
+    player.move_info = move_info
+
     //if they're dead, they do nothing
     if (player.is_dead){
       player.input_type = INPUT_NONE
@@ -362,10 +391,14 @@ exports.resolve = function(){
         y:player.y,
         attacker:player
       }
-      if (player.input_dir == DIR_UP) point.y--
-      if (player.input_dir == DIR_RIGHT) point.x++
-      if (player.input_dir == DIR_DOWN) point.y++
-      if (player.input_dir == DIR_LEFT) point.x--
+      if (player.input_dir == DIR_UP)     point.y--
+      if (player.input_dir == DIR_RIGHT)  point.x++
+      if (player.input_dir == DIR_DOWN)   point.y++
+      if (player.input_dir == DIR_LEFT)   point.x--
+
+      //for animation sake, store that point
+      player.move_info.target_pos.x = point.x
+      player.move_info.target_pos.y = point.y
 
       slash_points.push(point)
     }
@@ -447,24 +480,15 @@ exports.move_players = function(){
       console.log("BAD BAD THIS PLAYER SHOULD NOT MOVE WITH INPUT: "+player.input_type)
     }
 
-    //make a holder for this info
-    let move_info = {}
-    move_info.succeeded = true
-
-    //start by figuring out where they want to go
-    move_info.target_pos = {
-      x:player.x,
-      y:player.y
-    }
-    if (player.input_dir == DIR_UP)     move_info.target_pos.y--
-    if (player.input_dir == DIR_RIGHT)  move_info.target_pos.x++
-    if (player.input_dir == DIR_DOWN)   move_info.target_pos.y++
-    if (player.input_dir == DIR_LEFT)   move_info.target_pos.x--
-
-    player.move_info = move_info
+    //where do they want to go?
+    if (player.input_dir == DIR_UP)     player.move_info.target_pos.y--
+    if (player.input_dir == DIR_RIGHT)  player.move_info.target_pos.x++
+    if (player.input_dir == DIR_DOWN)   player.move_info.target_pos.y++
+    if (player.input_dir == DIR_LEFT)   player.move_info.target_pos.x--
 
     //if anybody walked into a wall we can resolve them right now
     if (exports.is_move_valid(player.move_info.target_pos) == false){
+      player.move_info.succeeded = false
       console.log(player.disp_name+" walked into a wall")
       occupied_spots.push( {x:player.x, y:player.y} )
       unresolved.splice(i, 1)
@@ -624,7 +648,8 @@ exports.generate_game_info = function(){
     turn_num: turn_num,
     max_turn_num: max_turn_num,
     time:time,
-    game_state:game_state
+    game_state:game_state,
+    winner_last_round:prev_winner
   }
 
   //console.log("game state "+val.game_state)
@@ -656,9 +681,9 @@ exports.remove_player = function(ws){
 		if (players[i].ws == ws){
 			console.log("found and killed player")
       //during the game, only remove the player if they are alive
-      if (game_state == STATE_WAITING || !players[i].is_dead){
+      //if (game_state == STATE_WAITING || !players[i].is_dead){  //THIS WAS A BAD IDEA
 			 players.splice(i, 1)
-      }
+      //}
 			if ( game_state == STATE_WAITING){
 			  communication.send_wait_pulse()
 			}
