@@ -13,7 +13,7 @@ var beat_phase = 0
 
 var turn_num = 0
 
-var turns_before_lava = 30
+var turns_before_lava = 25
 var lava_turn_spacing = 6
 
 //game state
