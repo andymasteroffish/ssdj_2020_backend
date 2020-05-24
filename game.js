@@ -92,7 +92,7 @@ exports.reset_game = function(){
   spawn_points.push( {x:2, y:5})
 
   spawn_points.push( {x:5, y:1})
-  spawn_points.push( {x:6, y:4})
+  spawn_points.push( {x:6, y:3})
   spawn_points.push( {x:6, y:5})
 
   spawn_points.push( {x:3, y:2})
