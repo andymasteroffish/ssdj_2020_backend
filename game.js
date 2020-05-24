@@ -112,7 +112,8 @@ exports.make_tile = function(){
 		passable: true,
     prev_passable: true,
     weak:false,
-    lava_timer:9999
+    lava_timer:9999,
+    rand_val: Math.random()
 	}
 }
 
