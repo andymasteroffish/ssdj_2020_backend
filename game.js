@@ -127,6 +127,10 @@ exports.end_game = function(winner){
   game_state = STATE_WAITING
   prev_winner = winner
 
+  if (winner != null){
+    winner.win_streak++
+  }
+
   pregame_countdown_timer = countdown_ticks_to_game_start
   
   prev_players = []
@@ -154,6 +158,10 @@ exports.join_player = function (msg, _ws){
       console.log("an oldie but a goodie")
       player = prev_players[i]
       player.games_played++
+      player.is_dead = false
+      player.is_stunned = false
+      player.sprite_pack = exports.get_next_sprite_pack()
+      player.disp_name = msg.disp_name
     }
   }
 
@@ -431,6 +439,7 @@ exports.resolve = function(){
         }
         else{
           player.is_dead = true
+          player.win_streak = 0 
         }
       }
     }
