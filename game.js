@@ -44,7 +44,7 @@ var in_slow_mode = false
 var slow_mode_can_resolve = false
 
 //player sprites
-var num_sprite_packs = 8
+//var num_sprite_packs = 8
 var available_sprite_packs = []
 
 exports.setup = function(){
@@ -71,9 +71,15 @@ exports.reset_game = function(){
 
   //mark that all characters are available
   available_sprite_packs = []
-  for (let i=0; i<num_sprite_packs; i++){
-    available_sprite_packs.push(true)
-  }
+  available_sprite_packs.push("BaldyBlue")
+  available_sprite_packs.push("CrypticCyan")
+  available_sprite_packs.push("GooeyGreen")
+  available_sprite_packs.push("OrneryOrange")
+  available_sprite_packs.push("PlacidPink")
+  available_sprite_packs.push("RadRed")
+  available_sprite_packs.push("ViciousViolet")
+  available_sprite_packs.push("ViciousViolet")
+  
 
   turn_num = 0
 
@@ -213,14 +219,25 @@ exports.get_valid_spawn = function(){
 }
 
 exports.get_next_sprite_pack = function(){
-  for (let i=0; i<num_sprite_packs; i++){
-    if (available_sprite_packs[i]){
-      available_sprite_packs[i] = false
-      return i
-    }
+  if (available_sprite_packs.length < 0){
+    console.log("NO MORE SPRITE PACKS!!!!")
+    return null
   }
-  console.log("ran out of sprite packs!!!!")
-  return 0
+
+  let index = Math.floor(Math.random()*available_sprite_packs.length)
+  let val = available_sprite_packs[index]
+  console.log("give them sprite pack "+index+" : "+val)
+
+  available_sprite_packs.splice(index, 1)
+  return val
+  // for (let i=0; i<num_sprite_packs; i++){
+  //   if (available_sprite_packs[i]){
+  //     available_sprite_packs[i] = false
+  //     return i
+  //   }
+  // }
+  // console.log("ran out of sprite packs!!!!")
+  // return 0
 }
 
 exports.parse_client_move = function(msg, ws){
