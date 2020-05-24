@@ -1,8 +1,8 @@
 const communication = require('./ws_communication.js')
 
 //board
-var cols = 9
-var rows = 8
+var cols = 8
+var rows = 7
 var board = []
 
 //timing (in millis)
@@ -49,6 +49,8 @@ var slow_mode_can_resolve = false
 //var num_sprite_packs = 8
 var available_sprite_packs = []
 
+var spawn_points = []
+
 exports.setup = function(){
 	game_state = STATE_WAITING
  	exports.reset_game()
@@ -81,34 +83,47 @@ exports.reset_game = function(){
   available_sprite_packs.push("RadRed")
   available_sprite_packs.push("ViciousViolet")
   available_sprite_packs.push("ViciousViolet")
+
+  spawn_points = []
+  spawn_points.push( {x:1, y:1})
+  spawn_points.push( {x:1, y:4})
+  spawn_points.push( {x:2, y:5})
+
+  spawn_points.push( {x:5, y:1})
+  spawn_points.push( {x:6, y:4})
+  spawn_points.push( {x:6, y:5})
+
+  spawn_points.push( {x:3, y:2})
+  spawn_points.push( {x:4, y:4})
   
 
   turn_num = 0
 
-  //create a 2d array
-  board = new Array(cols)
-  for (let i=0; i<cols; i++){
-    board[i] = new Array(rows)
-  }
-  //fill it up with new Tile objects
-  for (let c=0; c<cols; c++){
-    for (let r=0; r<rows; r++){
-      board[c][r] = exports.make_tile()
-    }
-  }
+  exports.make_map()
+  // //create a 2d array
+  // board = new Array(cols)
+  // for (let i=0; i<cols; i++){
+  //   board[i] = new Array(rows)
+  // }
+  // //fill it up with new Tile objects
+  // for (let c=0; c<cols; c++){
+  //   for (let r=0; r<rows; r++){
+  //     board[c][r] = exports.make_tile()
+  //   }
+  // }
 
-  //make the borders into walls
-  for (let c=0; c<cols; c++){
-  	board[c][0].passable = false
-  	board[c][rows-1].passable = false
-  }
-  for (let r=0; r<rows; r++){
-  	board[0][r].passable = false
-  	board[cols-1][r].passable = false
-  }
+  // //make the borders into walls
+  // for (let c=0; c<cols; c++){
+  // 	board[c][0].passable = false
+  // 	board[c][rows-1].passable = false
+  // }
+  // for (let r=0; r<rows; r++){
+  // 	board[0][r].passable = false
+  // 	board[cols-1][r].passable = false
+  // }
 
-  //testing
-  board[2][2].passable = false
+  // //testing
+  // board[2][2].passable = false
 }
 
 exports.make_tile = function(){
@@ -146,7 +161,21 @@ exports.end_game = function(winner){
 exports.join_player = function (msg, _ws){
   if (available_sprite_packs.length == 0){
     console.log("no more room!")
+    _ws.send( JSON.stringify({type:"join_rejected", reason: "game is full"}))
     return
+  }
+  if (game_state == STATE_PLAYING){
+    console.log("can't join in progress game!")
+    _ws.send( JSON.stringify({type:"join_rejected", reason: "game is currently playing"}))
+    return
+  }
+
+  //if this webhook already in?
+  for (let i=0; i<players.length; i++){
+    if (players[i].ws == _ws){
+      console.log("this client is alreayd in. Ignoring join....")
+      return
+    }
   }
 
   console.log(msg)
@@ -197,7 +226,7 @@ exports.join_player = function (msg, _ws){
   player.prev_state.y = player.y
   player.prev_state.is_dead = player.is_dead
 
-  console.log("got a new friend! id:"+player.id)
+  console.log("got a new friend! "+player.disp_name)
 
   player.uuid = msg.uuid
   console.log("  my uuid: "+msg.uuid)
@@ -209,6 +238,17 @@ exports.join_player = function (msg, _ws){
 }
 
 exports.get_valid_spawn = function(){
+  if (spawn_points.length == 0){
+    console.log("BAD! No more spawn points")
+    return {x:0, y:0}
+  }
+
+  let index = Math.floor(Math.random()*spawn_points.length)
+  let pos = spawn_points[index]
+  spawn_points.splice(index, 1)
+  return pos
+
+  /*
   let pos = { x:0, y:0}
 
   let is_valid = false
@@ -230,6 +270,7 @@ exports.get_valid_spawn = function(){
   }
 
   return pos
+  */
 
 }
 
@@ -717,6 +758,104 @@ exports.get_game_state = function(){
 
 exports.get_beat_phase = function(){
 	return beat_phase
+}
+
+
+exports.make_map = function(){
+  //create a 2d array
+  board = new Array(cols)
+  for (let i=0; i<cols; i++){
+    board[i] = new Array(rows)
+  }
+  //fill it up with new Tile objects
+  for (let c=0; c<cols; c++){
+    for (let r=0; r<rows; r++){
+      board[c][r] = exports.make_tile()
+    }
+  }
+
+  //make the borders into walls
+  for (let c=0; c<cols; c++){
+    board[c][0].passable = false
+    board[c][rows-1].passable = false
+  }
+  for (let r=0; r<rows; r++){
+    board[0][r].passable = false
+    board[cols-1][r].passable = false
+  }
+
+  //set a bunch of tiles to be impassable
+  let num_obstacles = 7 + Math.random() * 15
+  console.log("I want "+num_obstacles+" obstacles")
+  for (let i=0; i<30; i++){
+    let x = Math.floor(1+Math.random()*(cols-2))
+    let y = Math.floor(1+Math.random()*(rows-2))
+    board[x][y].passable = false
+
+    //make sure all tiles connect to spawn 6
+    let all_connect = true
+    for (let i=0; i<spawn_points.length; i++){
+      let connects = exports.do_tiles_connect(spawn_points[i], spawn_points[6])
+      if (!connects){
+        all_connect = false
+      }
+    }
+
+    //if they don't, put that tile back the way it was
+    if (all_connect == false){
+      board[x][y].passable = true
+    }
+  }
+
+  //make sure all spawn points are passable
+  for (let i=0; i<spawn_points.length; i++){
+    board[spawn_points[i].x][spawn_points[i].y].passable = true
+  }
+
+  
+}
+
+exports.do_tiles_connect = function (tile_a, tile_b){
+
+  let unexplored = []
+  let explored = []
+
+  unexplored.push(tile_a)
+
+  while (unexplored.length > 0){
+    let cur_tile = unexplored.pop()
+    explored.push(cur_tile)
+
+    if (cur_tile.x == tile_b.x && cur_tile.y == tile_b.y){
+      return true
+    }
+
+    let neighbors = []
+    if (cur_tile.x > 0) neighbors.push({x:cur_tile.x-1, y:cur_tile.y})
+    if (cur_tile.y > 0) neighbors.push({x:cur_tile.x, y:cur_tile.y-1})
+    if (cur_tile.x < cols-1) neighbors.push({x:cur_tile.x+1, y:cur_tile.y})
+    if (cur_tile.y < rows-1) neighbors.push({x:cur_tile.x, y:cur_tile.y+1})
+
+    for (let i=0; i<neighbors.length; i++){
+      if (!exports.list_contians_tile(unexplored, neighbors[i]) && !exports.list_contians_tile(explored, neighbors[i])){
+        if (board[neighbors[i].x][neighbors[i].y].passable){
+          unexplored.push(neighbors[i])
+        }
+      }
+    }
+  }
+
+  return false
+
+}
+
+exports.list_contians_tile = function (list, tile){
+  for (let i=0; i<list.length; i++){
+    if (list[i].x == tile.x && list[i].y == tile.y){
+      return true
+    }
+  }
+  return false
 }
 
 //debug
