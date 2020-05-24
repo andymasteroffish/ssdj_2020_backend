@@ -383,6 +383,14 @@ exports.resolve = function(){
         if (player.input_type == INPUT_PARRY){
           console.log("but they parried")
           slash_point.attacker.is_stunned = true
+          //set the parry player to face their attacker
+          let attacker_x = slash_point.attacker.x
+          let attacker_y = slash_point.attacker.y
+          if (player.x == attacker_x-1) player.last_valid_input_dir = DIR_RIGHT
+          if (player.x == attacker_x+1) player.last_valid_input_dir = DIR_LEFT
+          if (player.y == attacker_y-1) player.last_valid_input_dir = DIR_DOWN
+          if (player.y == attacker_y+1) player.last_valid_input_dir = DIR_UP
+
         }
         else{
           player.is_dead = true
