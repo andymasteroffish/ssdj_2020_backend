@@ -13,7 +13,7 @@ var beat_phase = 0
 
 var turn_num = 0
 
-var turns_before_lava = 30
+var turns_before_lava = 25
 var lava_turn_spacing = 6
 
 //game state
@@ -129,6 +129,7 @@ exports.end_game = function(winner){
 
   if (winner != null){
     winner.win_streak++
+    console.log(winner)
   }
 
   pregame_countdown_timer = countdown_ticks_to_game_start
@@ -711,7 +712,6 @@ exports.generate_game_info = function(){
     winner_last_round:prev_winner
   }
 
-  //console.log("game state "+val.game_state)
 
   return val
 }
