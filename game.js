@@ -17,6 +17,8 @@ var game_state = 0
 var STATE_WAITING = 0
 var STATE_PLAYING = 1
 
+var prev_winner = null
+
 //players (a subset of clients)
 var players = [];
 var prev_players = [];
@@ -121,8 +123,9 @@ exports.start_game = function(){
 }
 
 exports.end_game = function(winner){
-  console.log("game over man")
+  console.log("game over man. winner: "+winner)
   game_state = STATE_WAITING
+  prev_winner = winner
 
   pregame_countdown_timer = countdown_ticks_to_game_start
   
@@ -132,7 +135,7 @@ exports.end_game = function(winner){
   }
 
   exports.reset_game()
-  communication.send_game_end(winner)
+  communication.send_game_end()
 }
 
 //creating a player object
@@ -342,6 +345,15 @@ exports.resolve = function(){
     player.prev_state.y = player.y
     player.prev_state.is_dead = player.is_dead
 
+    //info on if their move succeeded or not. Assume it did
+    let move_info = {}
+    move_info.succeeded = true
+    move_info.target_pos = {
+      x:player.x,
+      y:player.y
+    }
+    player.move_info = move_info
+
     //if they're dead, they do nothing
     if (player.is_dead){
       player.input_type = INPUT_NONE
@@ -379,10 +391,14 @@ exports.resolve = function(){
         y:player.y,
         attacker:player
       }
-      if (player.input_dir == DIR_UP) point.y--
-      if (player.input_dir == DIR_RIGHT) point.x++
-      if (player.input_dir == DIR_DOWN) point.y++
-      if (player.input_dir == DIR_LEFT) point.x--
+      if (player.input_dir == DIR_UP)     point.y--
+      if (player.input_dir == DIR_RIGHT)  point.x++
+      if (player.input_dir == DIR_DOWN)   point.y++
+      if (player.input_dir == DIR_LEFT)   point.x--
+
+      //for animation sake, store that point
+      player.move_info.target_pos.x = point.x
+      player.move_info.target_pos.y = point.y
 
       slash_points.push(point)
     }
@@ -464,24 +480,15 @@ exports.move_players = function(){
       console.log("BAD BAD THIS PLAYER SHOULD NOT MOVE WITH INPUT: "+player.input_type)
     }
 
-    //make a holder for this info
-    let move_info = {}
-    move_info.succeeded = true
-
-    //start by figuring out where they want to go
-    move_info.target_pos = {
-      x:player.x,
-      y:player.y
-    }
-    if (player.input_dir == DIR_UP)     move_info.target_pos.y--
-    if (player.input_dir == DIR_RIGHT)  move_info.target_pos.x++
-    if (player.input_dir == DIR_DOWN)   move_info.target_pos.y++
-    if (player.input_dir == DIR_LEFT)   move_info.target_pos.x--
-
-    player.move_info = move_info
+    //where do they want to go?
+    if (player.input_dir == DIR_UP)     player.move_info.target_pos.y--
+    if (player.input_dir == DIR_RIGHT)  player.move_info.target_pos.x++
+    if (player.input_dir == DIR_DOWN)   player.move_info.target_pos.y++
+    if (player.input_dir == DIR_LEFT)   player.move_info.target_pos.x--
 
     //if anybody walked into a wall we can resolve them right now
     if (exports.is_move_valid(player.move_info.target_pos) == false){
+      player.move_info.succeeded = false
       console.log(player.disp_name+" walked into a wall")
       occupied_spots.push( {x:player.x, y:player.y} )
       unresolved.splice(i, 1)
@@ -641,7 +648,8 @@ exports.generate_game_info = function(){
     turn_num: turn_num,
     max_turn_num: max_turn_num,
     time:time,
-    game_state:game_state
+    game_state:game_state,
+    winner_last_round:prev_winner
   }
 
   //console.log("game state "+val.game_state)
@@ -673,9 +681,9 @@ exports.remove_player = function(ws){
 		if (players[i].ws == ws){
 			console.log("found and killed player")
       //during the game, only remove the player if they are alive
-      if (game_state == STATE_WAITING || !players[i].is_dead){
+      //if (game_state == STATE_WAITING || !players[i].is_dead){  //THIS WAS A BAD IDEA
 			 players.splice(i, 1)
-      }
+      //}
 			if ( game_state == STATE_WAITING){
 			  communication.send_wait_pulse()
 			}
