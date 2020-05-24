@@ -1,8 +1,8 @@
 const communication = require('./ws_communication.js')
 
 //board
-var cols = 6
-var rows = 5
+var cols = 9
+var rows = 8
 var board = []
 
 //timing (in millis)
