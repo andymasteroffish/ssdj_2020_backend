@@ -5,6 +5,8 @@ var cols = 8
 var rows = 7
 var board = []
 
+var rock_chance = 0.2
+
 //timing (in millis)
 var turn_time = 3000
 var beat_phase = 0
@@ -100,35 +102,14 @@ exports.reset_game = function(){
   turn_num = 0
 
   exports.make_map()
-  // //create a 2d array
-  // board = new Array(cols)
-  // for (let i=0; i<cols; i++){
-  //   board[i] = new Array(rows)
-  // }
-  // //fill it up with new Tile objects
-  // for (let c=0; c<cols; c++){
-  //   for (let r=0; r<rows; r++){
-  //     board[c][r] = exports.make_tile()
-  //   }
-  // }
 
-  // //make the borders into walls
-  // for (let c=0; c<cols; c++){
-  // 	board[c][0].passable = false
-  // 	board[c][rows-1].passable = false
-  // }
-  // for (let r=0; r<rows; r++){
-  // 	board[0][r].passable = false
-  // 	board[cols-1][r].passable = false
-  // }
-
-  // //testing
-  // board[2][2].passable = false
 }
 
 exports.make_tile = function(){
 	return{
-		passable: true
+		passable: true,
+    prev_passable: true,
+    weak:false
 	}
 }
 
@@ -389,6 +370,13 @@ exports.resolve = function(){
     return
   }
 
+  //initial board stuff
+  for (let c=0; c<cols; c++){
+    for (let r=0; r<rows; r++){
+      board[c][r].prev_passable = board[c][r].passable
+    }
+  }
+
   //initial player stuff
   for (let i=0; i<players.length; i++){
     let player = players[i]
@@ -482,6 +470,15 @@ exports.resolve = function(){
           player.is_dead = true
           player.win_streak = 0 
         }
+      }
+    }
+
+    //any weak obstacle on a slash point?
+    for (let s=0; s<slash_points.length; s++){
+      let slash_point = slash_points[s]
+      let tile = board[slash_point.x][slash_point.y]
+      if (!tile.passable && tile.weak){
+        tile.passable = true
       }
     }
 
@@ -777,11 +774,15 @@ exports.make_map = function(){
   //make the borders into walls
   for (let c=0; c<cols; c++){
     board[c][0].passable = false
+    board[c][0].weak = false
     board[c][rows-1].passable = false
+    board[c][rows-1].weak = false
   }
   for (let r=0; r<rows; r++){
     board[0][r].passable = false
+    board[0][r].weak = false
     board[cols-1][r].passable = false
+    board[cols-1][r].weak = false
   }
 
   //set a bunch of tiles to be impassable
@@ -804,12 +805,26 @@ exports.make_map = function(){
     //if they don't, put that tile back the way it was
     if (all_connect == false){
       board[x][y].passable = true
+    }else{
+      //small chance to make it a strong obstacle
+      if (Math.random() < rock_chance){
+        board[x][y].weak = false
+      }else{
+        board[x][y].weak = true
+      }
     }
   }
 
   //make sure all spawn points are passable
   for (let i=0; i<spawn_points.length; i++){
     board[spawn_points[i].x][spawn_points[i].y].passable = true
+  }
+
+  //get everything ready
+  for (let c=0; c<cols; c++){
+    for (let r=0; r<rows; r++){
+      board[c][r].prev_passable = board[c][r].passable
+    }
   }
 
   
