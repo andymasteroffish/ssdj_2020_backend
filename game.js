@@ -86,7 +86,7 @@ exports.reset_game = function(){
   available_sprite_packs.push("PlacidPink")
   available_sprite_packs.push("RadRed")
   available_sprite_packs.push("ViciousViolet")
-  available_sprite_packs.push("ViciousViolet")
+  available_sprite_packs.push("YummyYellow")
 
   spawn_points = []
   spawn_points.push( {x:1, y:1})
