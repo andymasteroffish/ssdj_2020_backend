@@ -12,7 +12,9 @@ var turn_time = 3000
 var beat_phase = 0
 
 var turn_num = 0
-var max_turn_num = 800
+
+var turns_before_lava = 20
+var lava_turn_spacing = 6
 
 //game state
 var game_state = 0
@@ -109,7 +111,8 @@ exports.make_tile = function(){
 	return{
 		passable: true,
     prev_passable: true,
-    weak:false
+    weak:false,
+    lava_timer:9999
 	}
 }
 
@@ -341,8 +344,7 @@ exports.tick = function(){
 exports.resolve = function(){
 
   turn_num++
-  console.log("turn "+turn_num+" out of "+max_turn_num)
-
+  
   //is there a winner or a draw?
   let num_living = 0
   let num_dead = 0
@@ -374,6 +376,7 @@ exports.resolve = function(){
   for (let c=0; c<cols; c++){
     for (let r=0; r<rows; r++){
       board[c][r].prev_passable = board[c][r].passable
+      board[c][r].lava_timer--
     }
   }
 
@@ -486,12 +489,17 @@ exports.resolve = function(){
     if (player.input_type == INPUT_PARRY && attacked_this_turn == false){
       player.is_stunned = true
     }
-  }
 
- //  //are we done?
-	// if (turn_num >= max_turn_num){
-	//  exports.end_game()
-	// }
+    //anybody standing on a tile that has become lava is worth less than dirt
+    for (let i=0; i<players.length; i++){
+      let player = players[i]
+      if (board[player.x][player.y].lava_timer <= 0){
+        player.is_dead = true
+        player.win_streak = 0 
+      }
+    }
+
+  }
 
 }
 
@@ -697,7 +705,6 @@ exports.generate_game_info = function(){
     board:board,
     players:players,
     turn_num: turn_num,
-    max_turn_num: max_turn_num,
     time:time,
     game_state:game_state,
     winner_last_round:prev_winner
@@ -777,12 +784,32 @@ exports.make_map = function(){
     board[c][0].weak = false
     board[c][rows-1].passable = false
     board[c][rows-1].weak = false
+
   }
   for (let r=0; r<rows; r++){
     board[0][r].passable = false
     board[0][r].weak = false
     board[cols-1][r].passable = false
     board[cols-1][r].weak = false
+  }
+
+  //setup lava
+  for (let c=0; c<cols; c++){
+    for (let r=0; r<rows; r++){
+
+      let center_x = cols/2-0.5
+      let center_y = rows/2-0.5
+
+      // let dist_from_center = Math.sqrt( Math.pow((c-center_x),2) + Math.pow((r-center_y),2) )
+      // let dist_to_center = 4 - dist_from_center
+      // board[c][r].lava_timer = Math.floor(turns_before_lava + dist_to_center*lava_turn_spacing)
+
+      let dist_horz = Math.min(c, cols-1-c) 
+      let dist_vert = Math.min(r, rows-1-r)
+      let dist = Math.min(dist_horz, dist_vert)
+      board[c][r].lava_timer = Math.floor(turns_before_lava + dist*lava_turn_spacing)
+      
+    }
   }
 
   //set a bunch of tiles to be impassable
