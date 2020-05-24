@@ -20,7 +20,7 @@ var STATE_PLAYING = 1
 //players (a subset of clients)
 var players = [];
 var prev_players = [];
-var next_player_id = 0
+//var next_player_id = 0
 
 var min_players_to_start = 2
 var countdown_ticks_to_game_start = 20
@@ -150,7 +150,7 @@ exports.join_player = function (msg, _ws){
     console.log("time for a new baby")
     player = {
       ws:_ws,
-      id:next_player_id,
+      //id:next_player_id,
       uuid:msg.uuid,
       disp_name:msg.disp_name,
       sprite_pack: exports.get_next_sprite_pack(),
@@ -165,7 +165,7 @@ exports.join_player = function (msg, _ws){
       games_played : 0,
       win_streak: 0
     }
-    next_player_id++
+    //next_player_id++
   }
 
   //set starting pos
@@ -237,7 +237,7 @@ exports.parse_client_move = function(msg, ws){
   //check what it was
   player.input_type = msg.action
   player.input_dir = msg.dir
-  if (player.input_dir != INPUT_NONE){
+  if (player.input_dir != DIR_NONE){
     player.last_valid_input_dir = player.input_dir
   }
 
