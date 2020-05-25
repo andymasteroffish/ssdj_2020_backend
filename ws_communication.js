@@ -35,7 +35,7 @@ exports.got_connection = function (ws){
 
 		if (msg.type === "force_start"){
 			console.log("you have forced me to start")
-			game.start_game()
+			game.start_game(true)
 		}
 
 		if (msg.type === "force_end"){

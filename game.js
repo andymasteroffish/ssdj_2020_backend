@@ -46,6 +46,7 @@ var INPUT_DASH = 3
 var INPUT_PARRY = 4
 
 //debug
+var debug_mode = false
 var in_slow_mode = false
 var slow_mode_can_resolve = false
 
@@ -117,7 +118,8 @@ exports.make_tile = function(){
 	}
 }
 
-exports.start_game = function(){
+exports.start_game = function(in_debug_mode){
+  debug_mode = in_debug_mode
   game_state = STATE_PLAYING
   beat_phase = 0
 }
@@ -129,7 +131,7 @@ exports.end_game = function(winner){
 
   if (winner != null){
     winner.win_streak++
-    console.log(winner)
+    //console.log(winner)
   }
 
   pregame_countdown_timer = countdown_ticks_to_game_start
@@ -330,7 +332,7 @@ exports.tick = function(){
 
   	if (game_state === STATE_WAITING){
 	    if (pregame_countdown_timer == 0){
-	      exports.start_game()
+	      exports.start_game(false)
 	      return
 	    }
 
@@ -363,7 +365,7 @@ exports.resolve = function(){
   console.log(" living: "+num_living+"  dead: "+num_dead)
 
   //if there is one living and no dead, I was probably testing
-  if (num_living == 1 && num_dead > 0){
+  if (num_living == 1 && !debug_mode){
     console.log("we have a winner: "+last_living_player.disp_name)
     exports.end_game(last_living_player)
     return
